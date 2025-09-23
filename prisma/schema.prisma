@@ -1,0 +1,561 @@
+// Prisma Schema for CHRONOS Multi-Tenant Financial SaaS
+// This schema implements multi-tenant architecture with Row Level Security (RLS)
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Tenant model for multi-tenancy
+model Tenant {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  domain      String?  @unique
+  status      TenantStatus @default(ACTIVE)
+  plan        TenantPlan @default(FREE)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Settings
+  settings    Json?
+  timezone    String   @default("UTC")
+  currency    String   @default("USD")
+  locale      String   @default("en")
+
+  // Relationships
+  users       User[]
+  accounts     Account[]
+  transactions Transaction[]
+  budgets      Budget[]
+  categories   Category[]
+  cards        Card[]
+  cardTransactions CardTransaction[]
+  balanceHistory BalanceHistory[]
+  whatsappChats WhatsAppChat[]
+  whatsappUsers WhatsAppUser[]
+  whatsappMessages WhatsAppMessage[]
+  auditLogs    AuditLog[]
+
+  @@map("tenants")
+  @@index([slug])
+  @@index([domain])
+  @@index([status])
+}
+
+// User management with tenant isolation
+model User {
+  id          String   @id @default(cuid())
+  tenantId    String
+  email       String
+  username    String?
+  firstName   String
+  lastName    String
+  password    String
+  phone       String?
+  avatar      String?
+  role        UserRole @default(USER)
+  status      UserStatus @default(ACTIVE)
+  isEmailVerified Boolean @default(false)
+  emailVerifiedAt DateTime?
+  lastLoginAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  accounts    Account[]
+  transactions Transaction[]
+  budgets      Budget[]
+  cards       Card[]
+  cardTransactions CardTransaction[]
+  whatsappChats WhatsAppChat[]
+  whatsappUsers WhatsAppUser[]
+  auditLogs    AuditLog[]
+  sessions     Session[]
+
+  @@unique([tenantId, email])
+  @@unique([tenantId, username])
+  @@map("users")
+  @@index([tenantId])
+  @@index([email])
+  @@index([tenantId, email])
+  @@index([role])
+  @@index([status])
+}
+
+// Session management
+model Session {
+  id          String   @id @default(cuid())
+  userId      String
+  token       String   @unique
+  refreshToken String? @unique
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  // Relationships
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// Financial Account model
+model Account {
+  id          String   @id @default(cuid())
+  tenantId    String
+  userId      String
+  name        String
+  type        AccountType
+  subtype     String?
+  balance     Decimal  @default(0) @db.Decimal(15, 2)
+  currency    String   @default("USD")
+  isActive    Boolean  @default(true)
+  description String?
+  bankName    String?
+  accountNumber String?
+  routingNumber String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  budgets      Budget[]
+  cards       Card[]
+  balanceHistory BalanceHistory[]
+
+  @@map("accounts")
+  @@index([tenantId])
+  @@index([userId])
+  @@index([tenantId, userId])
+  @@index([type])
+  @@index([isActive])
+}
+
+// Balance History model for tracking account balance changes
+model BalanceHistory {
+  id              String   @id @default(cuid())
+  tenantId        String
+  accountId       String
+  previousBalance Decimal  @db.Decimal(15, 2)
+  newBalance      Decimal  @db.Decimal(15, 2)
+  change          Decimal  @db.Decimal(15, 2)
+  description     String?
+  timestamp       DateTime @default(now())
+
+  // Relationships
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account     Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("balance_history")
+  @@index([tenantId])
+  @@index([accountId])
+  @@index([tenantId, accountId])
+  @@index([timestamp])
+}
+
+// Card model for credit/debit cards with security features
+model Card {
+  id          String   @id @default(cuid())
+  tenantId    String
+  userId      String
+  accountId   String
+
+  // Card details (encrypted/masked)
+  cardNumber      String  // Encrypted full number
+  maskedNumber    String  // Masked for display (****-****-****-1234)
+  cardholderName  String
+  expiryMonth     Int
+  expiryYear      Int
+  cvv             String  // Encrypted
+
+  // Card metadata
+  cardType        CardType
+  brand           String  // VISA, MASTERCARD, AMEX, etc.
+  issuer          String?
+
+  // Card status and limits
+  isActive        Boolean  @default(false) // Requires activation
+  isLocked        Boolean  @default(false)
+  dailyLimit      Decimal? @db.Decimal(15, 2)
+  monthlyLimit    Decimal? @db.Decimal(15, 2)
+
+  // Security features
+  pin             String?  // Encrypted PIN
+  activationCode  String?  // For card activation
+  activatedAt     DateTime?
+  lastUsedAt      DateTime?
+
+  // Metadata
+  notes           String?
+  tags            String[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relationships
+  tenant          Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account         Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  transactions    CardTransaction[]
+
+  @@map("cards")
+  @@index([tenantId])
+  @@index([userId])
+  @@index([accountId])
+  @@index([tenantId, userId])
+  @@index([cardType])
+  @@index([isActive])
+  @@index([maskedNumber])
+}
+
+// Card transactions for tracking card-specific transactions
+model CardTransaction {
+  id              String   @id @default(cuid())
+  tenantId        String
+  userId          String
+  cardId          String
+  transactionId   String
+
+  // Card-specific transaction data
+  merchantName    String?
+  merchantCategory String?
+  authorizationCode String?
+  processorResponse String?
+
+  // Location data
+  merchantLocation Json?
+
+  // Security data
+  isOnlineTransaction Boolean @default(false)
+  riskScore       Decimal? @db.Decimal(3, 2) // 0.00 to 1.00
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relationships
+  tenant          Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card            Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  transaction     Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@unique([transactionId]) // One-to-one with transaction
+  @@map("card_transactions")
+  @@index([tenantId])
+  @@index([userId])
+  @@index([cardId])
+  @@index([tenantId, userId])
+  @@index([merchantCategory])
+}
+
+// Transaction model with multi-tenant support
+model Transaction {
+  id          String   @id @default(cuid())
+  tenantId    String
+  userId      String
+  accountId   String
+  categoryId  String?
+  amount      Decimal  @db.Decimal(15, 2)
+  type        TransactionType
+  description String
+  notes       String?
+  date        DateTime
+  status      TransactionStatus @default(COMPLETED)
+  reference   String?
+  tags        String[]
+
+  // Location data
+  location    Json?
+
+  // WhatsApp integration
+  whatsappMessageSid String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account     Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  cardTransaction CardTransaction?
+
+  @@map("transactions")
+  @@index([tenantId])
+  @@index([userId])
+  @@index([accountId])
+  @@index([categoryId])
+  @@index([tenantId, userId])
+  @@index([tenantId, date])
+  @@index([type])
+  @@index([status])
+  @@index([date])
+  @@index([whatsappMessageSid])
+}
+
+// Category model for transaction classification
+model Category {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  color       String?
+  icon        String?
+  parentId    String?
+  isSystem    Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent      Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryHierarchy")
+  transactions Transaction[]
+  budgets      Budget[]
+
+  @@unique([tenantId, name])
+  @@map("categories")
+  @@index([tenantId])
+  @@index([parentId])
+  @@index([isSystem])
+  @@index([isActive])
+}
+
+// Budget model with multi-tenant support
+model Budget {
+  id          String   @id @default(cuid())
+  tenantId    String
+  userId      String
+  name        String
+  description String?
+  amount      Decimal  @db.Decimal(15, 2)
+  spent       Decimal  @default(0) @db.Decimal(15, 2)
+  period      BudgetPeriod
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean  @default(true)
+
+  // Notifications
+  alertThreshold Decimal? @db.Decimal(5, 2) // Percentage (e.g., 80.00 for 80%)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account     Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  accountId   String?
+  categoryId  String?
+
+  @@map("budgets")
+  @@index([tenantId])
+  @@index([userId])
+  @@index([accountId])
+  @@index([categoryId])
+  @@index([tenantId, userId])
+  @@index([period])
+  @@index([isActive])
+  @@index([startDate, endDate])
+}
+
+// WhatsApp integration models
+model WhatsAppUser {
+  id          String   @id @default(cuid())
+  tenantId    String
+  userId      String
+  phoneNumber String
+  whatsappNumber String
+  isVerified  Boolean  @default(false)
+  verificationCode String?
+  verificationExpiresAt DateTime?
+  preferences Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    WhatsAppMessage[]
+
+  @@unique([phoneNumber])
+  @@unique([tenantId, userId])
+  @@map("whatsapp_users")
+  @@index([tenantId])
+  @@index([userId])
+  @@index([phoneNumber])
+  @@index([whatsappNumber])
+}
+
+model WhatsAppMessage {
+  id          String   @id @default(cuid())
+  tenantId    String
+  whatsappUserId String?
+  messageSid  String   @unique // Twilio message SID
+  direction   MessageDirection
+  content     String
+  intent      String?
+  entities    Json?
+  processedAt DateTime?
+  responseSent Boolean @default(false)
+  createdAt   DateTime @default(now())
+
+  // Relationships
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  whatsappUser WhatsAppUser? @relation(fields: [whatsappUserId], references: [id], onDelete: SetNull)
+
+  @@map("whatsapp_messages")
+  @@index([tenantId])
+  @@index([whatsappUserId])
+  @@index([messageSid])
+  @@index([direction])
+  @@index([intent])
+  @@index([createdAt])
+}
+
+model WhatsAppChat {
+  id          String   @id @default(cuid())
+  tenantId    String
+  userId      String
+  phoneNumber String
+  displayName String?
+  isActive    Boolean  @default(true)
+  lastMessageAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, phoneNumber])
+  @@map("whatsapp_chats")
+  @@index([tenantId])
+  @@index([userId])
+  @@index([phoneNumber])
+  @@index([tenantId, phoneNumber])
+}
+
+// Audit logging for compliance and security
+model AuditLog {
+  id          String   @id @default(cuid())
+  tenantId    String
+  userId      String?
+  action      String
+  resource    String
+  resourceId  String?
+  oldValues   Json?
+  newValues   Json?
+  ipAddress   String?
+  userAgent   String?
+  timestamp   DateTime @default(now())
+
+  // Relationships
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+  @@index([tenantId])
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([timestamp])
+  @@index([tenantId, timestamp])
+}
+
+// Enums
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  INACTIVE
+}
+
+enum TenantPlan {
+  FREE
+  BASIC
+  PREMIUM
+  ENTERPRISE
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  TENANT_ADMIN
+  USER
+  VIEWER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+  CREDIT_CARD
+  INVESTMENT
+  LOAN
+  CASH
+  OTHER
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+enum BudgetPeriod {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  CUSTOM
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  DOCUMENT
+  AUDIO
+  VIDEO
+  LOCATION
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum CardType {
+  CREDIT
+  DEBIT
+  PREPAID
+}

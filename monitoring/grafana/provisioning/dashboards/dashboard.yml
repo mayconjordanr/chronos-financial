@@ -1,0 +1,12 @@
+# CHRONOS Financial - Grafana Dashboards Configuration
+
+apiVersion: 1
+
+providers:
+  - name: 'chronos-dashboards'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards

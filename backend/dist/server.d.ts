@@ -1,0 +1,3 @@
+declare function buildServer(): Promise<import("fastify").FastifyInstance<import("http2").Http2SecureServer<typeof import("http").IncomingMessage, typeof import("http").ServerResponse, typeof import("http2").Http2ServerRequest, typeof import("http2").Http2ServerResponse>, import("http2").Http2ServerRequest, import("http2").Http2ServerResponse<import("http2").Http2ServerRequest>, import("fastify").FastifyBaseLogger, import("fastify").FastifyTypeProviderDefault>>;
+export { buildServer };
+//# sourceMappingURL=server.d.ts.map

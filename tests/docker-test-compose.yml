@@ -1,0 +1,175 @@
+version: '3.8'
+
+services:
+  # Test PostgreSQL Database
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: chronos-postgres-test
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: chronos_test
+      POSTGRES_USER: chronos_test_user
+      POSTGRES_PASSWORD: chronos_test_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "5433:5432"  # Different port to avoid conflicts
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ../docker/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - chronos-test-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chronos_test_user -d chronos_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Test Redis for caching
+  redis-test:
+    image: redis:7-alpine
+    container_name: chronos-redis-test
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass test_redis_password
+    ports:
+      - "6380:6379"  # Different port to avoid conflicts
+    volumes:
+      - redis_test_data:/data
+    networks:
+      - chronos-test-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  # Test Backend API service
+  backend-test:
+    build:
+      context: ..
+      dockerfile: ./docker/backend/Dockerfile.test
+      target: test
+    container_name: chronos-backend-test
+    restart: unless-stopped
+    environment:
+      NODE_ENV: test
+      TEST_DATABASE_URL: postgresql://chronos_test_user:chronos_test_password@postgres-test:5432/chronos_test
+      TEST_REDIS_URL: redis://redis-test:6379
+      REDIS_PASSWORD: test_redis_password
+      JWT_SECRET: test_jwt_secret_for_testing_only
+      JWT_EXPIRES_IN: 1h
+      BCRYPT_ROUNDS: 4
+      PORT: 3001
+      LOG_LEVEL: error
+    ports:
+      - "3002:3001"  # Different port to avoid conflicts
+    volumes:
+      - ../backend:/app
+      - /app/node_modules
+      - ../prisma:/app/prisma
+      - ../tests:/app/tests
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    networks:
+      - chronos-test-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # Test runner service
+  test-runner:
+    build:
+      context: ..
+      dockerfile: ./docker/test/Dockerfile
+    container_name: chronos-test-runner
+    environment:
+      NODE_ENV: test
+      TEST_DATABASE_URL: postgresql://chronos_test_user:chronos_test_password@postgres-test:5432/chronos_test
+      TEST_REDIS_URL: redis://redis-test:6379
+      REDIS_PASSWORD: test_redis_password
+      JWT_SECRET: test_jwt_secret_for_testing_only
+      BCRYPT_ROUNDS: 4
+      CI: "true"
+    volumes:
+      - ../tests:/app/tests
+      - ../backend:/app/backend
+      - ../prisma:/app/prisma
+      - ../package.json:/app/package.json
+      - ../tsconfig.json:/app/tsconfig.json
+      - test_reports:/app/test-reports
+      - test_coverage:/app/coverage
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    networks:
+      - chronos-test-network
+    profiles:
+      - test  # Only start when explicitly requested
+
+  # Test database migration service
+  db-test-migrate:
+    build:
+      context: ..
+      dockerfile: ./docker/backend/Dockerfile.test
+      target: test
+    container_name: chronos-db-test-migrate
+    environment:
+      DATABASE_URL: postgresql://chronos_test_user:chronos_test_password@postgres-test:5432/chronos_test
+    volumes:
+      - ../prisma:/app/prisma
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    networks:
+      - chronos-test-network
+    command: ["npx", "prisma", "migrate", "deploy"]
+    profiles:
+      - migrate  # Only start when explicitly requested
+
+  # Load testing service
+  load-tester:
+    build:
+      context: ..
+      dockerfile: ./docker/load-test/Dockerfile
+    container_name: chronos-load-tester
+    environment:
+      TARGET_URL: http://backend-test:3001
+      CONCURRENT_USERS: 10
+      DURATION: 60s
+    volumes:
+      - load_test_reports:/app/reports
+    depends_on:
+      backend-test:
+        condition: service_healthy
+    networks:
+      - chronos-test-network
+    profiles:
+      - load-test  # Only start when explicitly requested
+
+volumes:
+  postgres_test_data:
+    driver: local
+  redis_test_data:
+    driver: local
+  test_reports:
+    driver: local
+  test_coverage:
+    driver: local
+  load_test_reports:
+    driver: local
+
+networks:
+  chronos-test-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16

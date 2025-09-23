@@ -1,0 +1,233 @@
+# CHRONOS Financial - Prometheus Alert Rules
+
+groups:
+  - name: chronos-application
+    rules:
+      # Application Health Alerts
+      - alert: ChronosBackendDown
+        expr: up{job="chronos-backend"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: backend
+        annotations:
+          summary: "CHRONOS Backend is down"
+          description: "The CHRONOS backend service has been down for more than 30 seconds"
+
+      - alert: ChronosFrontendDown
+        expr: up{job="chronos-frontend"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: frontend
+        annotations:
+          summary: "CHRONOS Frontend is down"
+          description: "The CHRONOS frontend service has been down for more than 30 seconds"
+
+      # Database Alerts
+      - alert: PostgreSQLDown
+        expr: up{job="postgres-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database has been down for more than 1 minute"
+
+      - alert: DatabaseConnectionsHigh
+        expr: pg_stat_database_numbackends > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "High number of database connections"
+          description: "Database has {{ $value }} active connections (threshold: 80)"
+
+      # Redis Alerts
+      - alert: RedisDown
+        expr: up{job="redis-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: cache
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache service has been down for more than 1 minute"
+
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: cache
+        annotations:
+          summary: "Redis memory usage is high"
+          description: "Redis memory usage is above 90% ({{ $value }}%)"
+
+  - name: chronos-performance
+    rules:
+      # Response Time Alerts
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, http_request_duration_seconds_bucket{job="chronos-backend"}) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "High API response time"
+          description: "95th percentile response time is {{ $value }}s (threshold: 2s)"
+
+      # Error Rate Alerts
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "High error rate"
+          description: "Error rate is {{ $value }}% (threshold: 5%)"
+
+      # Transaction Processing Alerts
+      - alert: TransactionProcessingDelay
+        expr: chronos_transaction_processing_duration_seconds > 30
+        for: 1m
+        labels:
+          severity: warning
+          service: business
+        annotations:
+          summary: "Transaction processing delay"
+          description: "Transaction processing is taking {{ $value }}s (threshold: 30s)"
+
+  - name: chronos-infrastructure
+    rules:
+      # System Resource Alerts
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}% on {{ $labels.instance }}"
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_size_bytes{fstype!="tmpfs"} - node_filesystem_free_bytes{fstype!="tmpfs"}) / node_filesystem_size_bytes{fstype!="tmpfs"} > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "Low disk space"
+          description: "Disk usage is {{ $value }}% on {{ $labels.instance }} ({{ $labels.mountpoint }})"
+
+      # Container Alerts
+      - alert: ContainerRestarted
+        expr: increase(docker_container_restarts_total[1h]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "Container restarted"
+          description: "Container {{ $labels.name }} has restarted {{ $value }} times in the last hour"
+
+  - name: chronos-business
+    rules:
+      # Business Logic Alerts
+      - alert: UnusualTransactionVolume
+        expr: rate(chronos_transactions_total[1h]) > 1000 or rate(chronos_transactions_total[1h]) < 10
+        for: 10m
+        labels:
+          severity: warning
+          service: business
+        annotations:
+          summary: "Unusual transaction volume"
+          description: "Transaction rate is {{ $value }} per hour (normal range: 10-1000)"
+
+      - alert: FailedTransactionRateHigh
+        expr: rate(chronos_transactions_total{status="failed"}[5m]) / rate(chronos_transactions_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          service: business
+        annotations:
+          summary: "High failed transaction rate"
+          description: "Failed transaction rate is {{ $value }}% (threshold: 10%)"
+
+      - alert: TenantIsolationBreach
+        expr: increase(chronos_tenant_isolation_violations_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: security
+        annotations:
+          summary: "Tenant isolation breach detected"
+          description: "{{ $value }} tenant isolation violations detected in the last 5 minutes"
+
+      # User Activity Alerts
+      - alert: NoUserActivity
+        expr: rate(chronos_user_sessions_total[1h]) == 0
+        for: 30m
+        labels:
+          severity: warning
+          service: business
+        annotations:
+          summary: "No user activity"
+          description: "No user sessions detected in the last hour"
+
+      - alert: SuspiciousUserActivity
+        expr: rate(chronos_failed_login_attempts_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "Suspicious user activity"
+          description: "{{ $value }} failed login attempts per minute (threshold: 10)"
+
+  - name: chronos-security
+    rules:
+      # Security Alerts
+      - alert: SSLCertificateExpiring
+        expr: (ssl_certificate_expiry_seconds - time()) / 86400 < 30
+        for: 1h
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "SSL certificate will expire in {{ $value }} days"
+
+      - alert: UnauthorizedAPIAccess
+        expr: rate(http_requests_total{status="401"}[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "High unauthorized access attempts"
+          description: "{{ $value }} unauthorized API access attempts per minute"
+
+      - alert: RateLimitExceeded
+        expr: rate(http_requests_total{status="429"}[5m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "Rate limit frequently exceeded"
+          description: "{{ $value }} rate limit violations per minute"

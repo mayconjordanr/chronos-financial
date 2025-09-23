@@ -1,0 +1,129 @@
+# Docker Compose Override for Local Development
+# This file provides developer-friendly overrides for the main docker-compose.yml
+
+version: '3.8'
+
+services:
+  # Override PostgreSQL for development convenience
+  postgres:
+    environment:
+      POSTGRES_DB: chronos_dev
+      POSTGRES_USER: chronos_user
+      POSTGRES_PASSWORD: chronos_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+      - ./backups:/backups
+
+  # Override Redis for development
+  redis:
+    command: redis-server --appendonly yes --requirepass redis_password
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+
+  # Backend development overrides
+  backend:
+    build:
+      context: .
+      dockerfile: ./docker/backend/Dockerfile.dev
+      target: development
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://chronos_user:chronos_password@postgres:5432/chronos_dev
+      REDIS_URL: redis://redis:6379
+      REDIS_PASSWORD: redis_password
+      JWT_SECRET: dev_jwt_secret_change_in_production
+      DEBUG: "chronos:*"
+      LOG_LEVEL: debug
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ./prisma:/app/prisma
+      - ./uploads:/app/uploads
+    ports:
+      - "3001:3001"
+      - "9229:9229" # Node.js debugging port
+
+  # Frontend development overrides
+  frontend:
+    build:
+      context: .
+      dockerfile: ./docker/frontend/Dockerfile.dev
+      target: development
+    environment:
+      NODE_ENV: development
+      VITE_API_URL: http://localhost:3001/api
+      VITE_WS_URL: ws://localhost:3001
+      VITE_APP_NAME: "CHRONOS Financial (Dev)"
+      CHOKIDAR_USEPOLLING: true
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+
+  # Nginx development overrides
+  nginx:
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+    ports:
+      - "80:80"
+
+  # Development tools
+  adminer:
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: pepa-linha
+
+  mailhog:
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  # Development database for testing
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: chronos-postgres-test
+    restart: "no"
+    environment:
+      POSTGRES_DB: chronos_test
+      POSTGRES_USER: chronos_test_user
+      POSTGRES_PASSWORD: chronos_test_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - chronos-network
+    profiles:
+      - testing
+
+  # Redis for testing
+  redis-test:
+    image: redis:7-alpine
+    container_name: chronos-redis-test
+    restart: "no"
+    command: redis-server --appendonly no
+    ports:
+      - "6380:6379"
+    networks:
+      - chronos-network
+    profiles:
+      - testing
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+  postgres_test_data:
+    driver: local
