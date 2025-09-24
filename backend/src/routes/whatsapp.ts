@@ -41,6 +41,19 @@ export async function whatsappRoutes(fastify: FastifyInstance): Promise<void> {
   // Apply error handler to all WhatsApp routes
   fastify.setErrorHandler(whatsAppErrorHandler);
 
+  // Middleware to check if WhatsApp is enabled
+  const checkWhatsAppEnabled = async (request: FastifyRequest, reply: FastifyReply) => {
+    const isEnabled = (request.server as any).whatsappEnabled;
+    if (!isEnabled) {
+      reply.code(503).send({
+        success: false,
+        error: 'WhatsApp integration is not configured or disabled',
+        service: 'whatsapp'
+      });
+      return;
+    }
+  };
+
   /**
    * GET /api/whatsapp/webhook - Webhook verification endpoint
    */
@@ -84,7 +97,7 @@ export async function whatsappRoutes(fastify: FastifyInstance): Promise<void> {
    * POST /api/whatsapp/send - Send message to user (authenticated)
    */
   fastify.post('/send', {
-    preHandler: [authenticateToken],
+    preHandler: [authenticateToken, checkWhatsAppEnabled],
     schema: {
       body: SendMessageSchema,
       response: {
@@ -168,6 +181,22 @@ export async function whatsappRoutes(fastify: FastifyInstance): Promise<void> {
     handler: async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const user = (request as any).user;
+        const isEnabled = (request.server as any).whatsappEnabled;
+
+        // Always return status even if WhatsApp is disabled
+        if (!isEnabled) {
+          reply.send({
+            serviceEnabled: false,
+            isLinked: false,
+            isVerified: false,
+            phoneNumber: null,
+            whatsappNumber: null,
+            messagesLast24h: 0,
+            lastActivity: null,
+            message: 'WhatsApp integration is not configured'
+          });
+          return;
+        }
 
         const whatsappUser = await prisma.whatsAppUser.findFirst({
           where: {
@@ -187,6 +216,7 @@ export async function whatsappRoutes(fastify: FastifyInstance): Promise<void> {
         });
 
         reply.send({
+          serviceEnabled: true,
           isLinked: !!whatsappUser,
           isVerified: whatsappUser?.isVerified || false,
           phoneNumber: whatsappUser?.phoneNumber,
@@ -207,7 +237,7 @@ export async function whatsappRoutes(fastify: FastifyInstance): Promise<void> {
    * POST /api/whatsapp/link-phone - Link phone number to user account (authenticated)
    */
   fastify.post('/link-phone', {
-    preHandler: [authenticateToken],
+    preHandler: [authenticateToken, checkWhatsAppEnabled],
     schema: {
       body: LinkPhoneSchema,
     },
@@ -275,7 +305,7 @@ export async function whatsappRoutes(fastify: FastifyInstance): Promise<void> {
    * POST /api/whatsapp/send-verification - Send verification code (authenticated)
    */
   fastify.post('/send-verification', {
-    preHandler: [authenticateToken],
+    preHandler: [authenticateToken, checkWhatsAppEnabled],
     schema: {
       body: VerificationCodeSchema,
     },
@@ -323,7 +353,7 @@ export async function whatsappRoutes(fastify: FastifyInstance): Promise<void> {
    * POST /api/whatsapp/verify - Verify phone number with code (authenticated)
    */
   fastify.post('/verify', {
-    preHandler: [authenticateToken],
+    preHandler: [authenticateToken, checkWhatsAppEnabled],
     schema: {
       body: VerifyUserSchema,
     },
@@ -483,7 +513,7 @@ export async function whatsappRoutes(fastify: FastifyInstance): Promise<void> {
    */
   if (process.env.NODE_ENV === 'development') {
     fastify.post('/test', {
-      preHandler: [authenticateToken],
+      preHandler: [authenticateToken, checkWhatsAppEnabled],
       schema: {
         body: {
           type: 'object',

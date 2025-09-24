@@ -236,7 +236,7 @@ export function CardDialog({
               >
                 <CardForm
                   initialData={card}
-                  mode={mode}
+                  mode={mode === 'view' ? 'edit' : mode}
                   onSubmit={handleSubmit}
                   isLoading={state.isSubmitting}
                 />

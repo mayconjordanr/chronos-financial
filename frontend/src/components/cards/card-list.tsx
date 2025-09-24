@@ -236,7 +236,7 @@ export function CardList({
           </div>
 
           {/* View Toggle */}
-          <Tabs value={viewMode} onValueChange={(value: ViewMode) => setViewMode(value)}>
+          <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as ViewMode)}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="grid" className="flex items-center gap-2">
                 <Grid className="h-4 w-4" />

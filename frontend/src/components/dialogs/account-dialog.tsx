@@ -195,7 +195,7 @@ export function AccountDialog({
                 onSubmit={handleSubmit}
                 onCancel={handleCancel}
                 isLoading={isLoading}
-                error={error}
+                error={error || undefined}
               />
             </motion.div>
           </AnimatePresence>

@@ -47,8 +47,11 @@ async function buildServer() {
     const authService = new AuthService(prisma, redis);
     const realtimeService = new RealtimeService();
 
-    // Initialize WhatsApp integration
-    initializeWhatsAppIntegration();
+    // Initialize WhatsApp integration (optional)
+    const whatsappStatus = initializeWhatsAppIntegration();
+
+    // Store WhatsApp status for use in routes
+    fastify.decorate('whatsappEnabled', whatsappStatus.enabled);
 
     // Register plugins
     await fastify.register(helmet, {

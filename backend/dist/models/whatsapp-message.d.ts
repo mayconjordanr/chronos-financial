@@ -13,8 +13,8 @@ export declare const CreateWhatsAppMessageSchema: z.ZodObject<{
 }, "strip", z.ZodTypeAny, {
     tenantId: string;
     content: string;
-    direction: "INBOUND" | "OUTBOUND";
     messageSid: string;
+    direction: "INBOUND" | "OUTBOUND";
     responseSent: boolean;
     intent?: string | undefined;
     entities?: Record<string, any> | undefined;
@@ -23,13 +23,13 @@ export declare const CreateWhatsAppMessageSchema: z.ZodObject<{
 }, {
     tenantId: string;
     content: string;
-    direction: "INBOUND" | "OUTBOUND";
     messageSid: string;
+    direction: "INBOUND" | "OUTBOUND";
     intent?: string | undefined;
     entities?: Record<string, any> | undefined;
     processedAt?: Date | undefined;
-    whatsappUserId?: string | undefined;
     responseSent?: boolean | undefined;
+    whatsappUserId?: string | undefined;
 }>;
 export declare const UpdateWhatsAppMessageSchema: z.ZodObject<{
     intent: z.ZodOptional<z.ZodString>;
@@ -65,8 +65,8 @@ export declare const MessageQuerySchema: z.ZodObject<{
     tenantId?: string | undefined;
     intent?: string | undefined;
     direction?: "INBOUND" | "OUTBOUND" | undefined;
-    whatsappUserId?: string | undefined;
     responseSent?: boolean | undefined;
+    whatsappUserId?: string | undefined;
     dateFrom?: Date | undefined;
     dateTo?: Date | undefined;
 }, {
@@ -75,8 +75,8 @@ export declare const MessageQuerySchema: z.ZodObject<{
     offset?: number | undefined;
     intent?: string | undefined;
     direction?: "INBOUND" | "OUTBOUND" | undefined;
-    whatsappUserId?: string | undefined;
     responseSent?: boolean | undefined;
+    whatsappUserId?: string | undefined;
     dateFrom?: Date | undefined;
     dateTo?: Date | undefined;
     includeUser?: boolean | undefined;

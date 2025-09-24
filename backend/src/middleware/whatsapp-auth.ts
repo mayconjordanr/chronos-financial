@@ -148,7 +148,7 @@ export async function whatsAppRateLimit(
  */
 export async function logWhatsAppRequest(
   request: FastifyRequest,
-  reply: FastifyReply
+  _reply: FastifyReply
 ): Promise<void> {
   const body = request.body as any;
 
@@ -223,7 +223,7 @@ export async function whatsAppErrorHandler(
 /**
  * Validate environment variables for WhatsApp integration
  */
-export function validateWhatsAppConfig(): void {
+export function validateWhatsAppConfig(): { isValid: boolean; errors: string[] } {
   const requiredVars = [
     'TWILIO_ACCOUNT_SID',
     'TWILIO_AUTH_TOKEN',
@@ -231,37 +231,44 @@ export function validateWhatsAppConfig(): void {
   ];
 
   const missing = requiredVars.filter(varName => !process.env[varName]);
+  const errors: string[] = [];
 
   if (missing.length > 0) {
-    throw new Error(`Missing required environment variables for WhatsApp integration: ${missing.join(', ')}`);
+    errors.push(`Missing required environment variables: ${missing.join(', ')}`);
   }
 
-  // Validate format
+  // Validate format only if variables exist
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   if (accountSid && !accountSid.startsWith('AC')) {
-    throw new Error('Invalid TWILIO_ACCOUNT_SID format');
+    errors.push('Invalid TWILIO_ACCOUNT_SID format (should start with AC)');
   }
 
   const whatsappNumber = process.env.TWILIO_WHATSAPP_NUMBER;
   if (whatsappNumber && !whatsappNumber.startsWith('+')) {
     console.warn('⚠️ TWILIO_WHATSAPP_NUMBER should include country code (e.g., +1234567890)');
   }
+
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
 }
 
 /**
  * Initialize WhatsApp integration
  */
-export function initializeWhatsAppIntegration(): void {
-  try {
-    validateWhatsAppConfig();
-    console.log('✅ WhatsApp integration configuration validated');
-  } catch (error) {
-    console.error('❌ WhatsApp integration configuration error:', error);
+export function initializeWhatsAppIntegration(): { enabled: boolean; errors?: string[] } {
+  const validation = validateWhatsAppConfig();
 
-    if (process.env.NODE_ENV === 'production') {
-      throw error;
-    } else {
-      console.warn('⚠️ WhatsApp integration disabled in development mode due to configuration error');
-    }
+  if (validation.isValid) {
+    console.log('✅ WhatsApp integration configuration validated - WhatsApp enabled');
+    return { enabled: true };
+  } else {
+    console.warn('⚠️ WhatsApp integration disabled due to configuration issues:');
+    validation.errors.forEach(error => console.warn(`   - ${error}`));
+    console.warn('   WhatsApp endpoints will return "service unavailable" responses');
+
+    // Don't throw error - let the backend start without WhatsApp
+    return { enabled: false, errors: validation.errors };
   }
 }

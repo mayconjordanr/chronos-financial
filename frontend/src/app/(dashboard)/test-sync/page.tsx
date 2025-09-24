@@ -21,8 +21,9 @@ import {
 } from 'lucide-react'
 import { useMultiTabSync, useTabCoordination } from '@/lib/hooks/use-multi-tab-sync'
 import { useRealtime } from '@/lib/hooks/use-realtime'
+import { useRealTimeContext } from '@/lib/providers/realtime-provider'
 import { useOffline } from '@/lib/hooks/use-offline'
-import { useOptimisticCreateTransaction, useOptimisticUpdateTransaction, useOptimisticDeleteTransaction } from '@/lib/hooks/use-optimistic-updates'
+import { useOptimisticCreateTransaction } from '@/lib/hooks/use-optimistic-updates'
 import { toast } from 'sonner'
 
 interface TestOperation {
@@ -41,11 +42,12 @@ export default function TestSyncPage() {
   // Real-time hooks
   const {
     isConnected,
-    isConnecting,
-    connectionError,
+    lastError: connectionError,
     connect,
     disconnect
-  } = useRealtime({ autoConnect: true })
+  } = useRealTimeContext()
+
+  const { isReconnecting } = useRealtime([])
 
   // Offline hooks
   const {
@@ -63,25 +65,21 @@ export default function TestSyncPage() {
     tabId,
     activeTabs,
     activeTabCount,
-    isActiveTab,
-    isOnlyActiveTab,
     broadcastUserAction,
     invalidateQueries
   } = useMultiTabSync()
 
   // Tab coordination
   const {
+    isActiveTab,
+    isOnlyActiveTab,
     shouldMaintainConnection,
     shouldPerformAction,
     broadcastConnectionStatus
   } = useTabCoordination()
 
   // Optimistic updates
-  const {
-    createTransaction,
-    confirmUpdate,
-    rollbackUpdate
-  } = useOptimisticTransactions()
+  const createTransactionMutation = useOptimisticCreateTransaction()
 
   // Simulate creating a transaction with optimistic updates
   const handleCreateTransaction = () => {
@@ -94,14 +92,13 @@ export default function TestSyncPage() {
       date: new Date().toISOString()
     }
 
-    const rollback = createTransaction(mockTransaction, {
+    createTransactionMutation.mutate(mockTransaction, {
       onSuccess: () => {
         toast.success('Transaction created successfully!')
         broadcastUserAction('Transaction Created', mockTransaction, true)
       },
-      onError: (error, rollbackFn) => {
+      onError: (error) => {
         toast.error('Failed to create transaction')
-        rollbackFn()
       }
     })
 
@@ -115,15 +112,13 @@ export default function TestSyncPage() {
     }
     setTestOperations(prev => [operation, ...prev])
 
-    // Simulate API call that might fail
+    // Simulate API call result
     setTimeout(() => {
       if (Math.random() > 0.7) {
         // Simulate failure
         operation.status = 'failed'
-        rollback()
       } else {
         operation.status = 'completed'
-        confirmUpdate(operation.id)
       }
       setTestOperations(prev => prev.map(op => op.id === operation.id ? operation : op))
     }, 2000)
@@ -196,7 +191,7 @@ export default function TestSyncPage() {
               {isConnected ? 'Connected' : 'Disconnected'}
             </div>
             <p className="text-xs text-muted-foreground">
-              {isConnecting ? 'Connecting...' : connectionError || 'WebSocket status'}
+              {isReconnecting ? 'Reconnecting...' : connectionError || 'WebSocket status'}
             </p>
           </CardContent>
         </Card>
@@ -236,7 +231,7 @@ export default function TestSyncPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {isOnlyActiveTab ? 'Primary' : 'Secondary'}
+              {isOnlyActiveTab() ? 'Primary' : 'Secondary'}
             </div>
             <p className="text-xs text-muted-foreground">
               {shouldMaintainConnection() ? 'Maintains connection' : 'Passive mode'}

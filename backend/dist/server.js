@@ -39,7 +39,8 @@ async function buildServer() {
         await redis.connect();
         const authService = new auth_service_1.AuthService(prisma, redis);
         const realtimeService = new realtime_1.RealtimeService();
-        (0, whatsapp_auth_1.initializeWhatsAppIntegration)();
+        const whatsappStatus = (0, whatsapp_auth_1.initializeWhatsAppIntegration)();
+        fastify.decorate('whatsappEnabled', whatsappStatus.enabled);
         await fastify.register(helmet_1.default, {
             contentSecurityPolicy: false
         });

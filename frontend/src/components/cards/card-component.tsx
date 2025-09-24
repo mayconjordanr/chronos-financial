@@ -41,7 +41,7 @@ export function CardComponent({
       scale: 1.02,
       transition: {
         duration: 0.3,
-        ease: 'easeOut',
+        ease: "easeOut" as any,
       },
     },
     tap: {

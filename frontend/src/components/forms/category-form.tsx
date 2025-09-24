@@ -47,7 +47,7 @@ export function CategoryForm({
   const schema = mode === "create" ? createCategorySchema : updateCategorySchema
 
   const form = useForm<CreateCategory | UpdateCategory>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any,
     defaultValues: {
       name: "",
       description: "",

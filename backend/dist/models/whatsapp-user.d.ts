@@ -25,15 +25,15 @@ export declare const UpdateWhatsAppUserSchema: z.ZodObject<{
     verificationExpiresAt: z.ZodOptional<z.ZodDate>;
     preferences: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodAny>>;
 }, "strip", z.ZodTypeAny, {
-    preferences?: Record<string, any> | undefined;
     isVerified?: boolean | undefined;
     verificationCode?: string | undefined;
     verificationExpiresAt?: Date | undefined;
+    preferences?: Record<string, any> | undefined;
 }, {
-    preferences?: Record<string, any> | undefined;
     isVerified?: boolean | undefined;
     verificationCode?: string | undefined;
     verificationExpiresAt?: Date | undefined;
+    preferences?: Record<string, any> | undefined;
 }>;
 export declare const WhatsAppUserQuerySchema: z.ZodObject<{
     tenantId: z.ZodOptional<z.ZodString>;
@@ -53,8 +53,8 @@ export declare const WhatsAppUserQuerySchema: z.ZodObject<{
     tenantId?: string | undefined;
     userId?: string | undefined;
     phoneNumber?: string | undefined;
-    includeUser?: boolean | undefined;
     isVerified?: boolean | undefined;
+    includeUser?: boolean | undefined;
     includeTenant?: boolean | undefined;
 }>;
 export type CreateWhatsAppUserInput = z.infer<typeof CreateWhatsAppUserSchema>;

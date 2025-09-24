@@ -89,7 +89,7 @@ async function whatsAppRateLimit(request, reply) {
         console.error('Rate limiting error:', error);
     }
 }
-async function logWhatsAppRequest(request, reply) {
+async function logWhatsAppRequest(request, _reply) {
     const body = request.body;
     console.log('WhatsApp webhook received:', {
         messageSid: body.MessageSid,
@@ -136,31 +136,34 @@ function validateWhatsAppConfig() {
         'TWILIO_WHATSAPP_NUMBER',
     ];
     const missing = requiredVars.filter(varName => !process.env[varName]);
+    const errors = [];
     if (missing.length > 0) {
-        throw new Error(`Missing required environment variables for WhatsApp integration: ${missing.join(', ')}`);
+        errors.push(`Missing required environment variables: ${missing.join(', ')}`);
     }
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
     if (accountSid && !accountSid.startsWith('AC')) {
-        throw new Error('Invalid TWILIO_ACCOUNT_SID format');
+        errors.push('Invalid TWILIO_ACCOUNT_SID format (should start with AC)');
     }
     const whatsappNumber = process.env.TWILIO_WHATSAPP_NUMBER;
     if (whatsappNumber && !whatsappNumber.startsWith('+')) {
         console.warn('⚠️ TWILIO_WHATSAPP_NUMBER should include country code (e.g., +1234567890)');
     }
+    return {
+        isValid: errors.length === 0,
+        errors
+    };
 }
 function initializeWhatsAppIntegration() {
-    try {
-        validateWhatsAppConfig();
-        console.log('✅ WhatsApp integration configuration validated');
+    const validation = validateWhatsAppConfig();
+    if (validation.isValid) {
+        console.log('✅ WhatsApp integration configuration validated - WhatsApp enabled');
+        return { enabled: true };
     }
-    catch (error) {
-        console.error('❌ WhatsApp integration configuration error:', error);
-        if (process.env.NODE_ENV === 'production') {
-            throw error;
-        }
-        else {
-            console.warn('⚠️ WhatsApp integration disabled in development mode due to configuration error');
-        }
+    else {
+        console.warn('⚠️ WhatsApp integration disabled due to configuration issues:');
+        validation.errors.forEach(error => console.warn(`   - ${error}`));
+        console.warn('   WhatsApp endpoints will return "service unavailable" responses');
+        return { enabled: false, errors: validation.errors };
     }
 }
 //# sourceMappingURL=whatsapp-auth.js.map

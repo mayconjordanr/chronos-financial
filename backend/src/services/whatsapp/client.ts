@@ -23,20 +23,51 @@ export interface SendMessageResponse {
 }
 
 export class WhatsAppClient {
-  private client: Twilio;
+  private client: Twilio | null;
   private phoneNumber: string;
+  private isEnabled: boolean;
 
   constructor(config: WhatsAppConfig) {
-    this.client = new Twilio(config.accountSid, config.authToken);
     this.phoneNumber = config.phoneNumber;
+
+    // Only initialize Twilio client if credentials are available
+    if (config.accountSid && config.authToken && config.phoneNumber) {
+      try {
+        this.client = new Twilio(config.accountSid, config.authToken);
+        this.isEnabled = true;
+      } catch (error) {
+        console.warn('⚠️ Failed to initialize Twilio client:', error);
+        this.client = null;
+        this.isEnabled = false;
+      }
+    } else {
+      this.client = null;
+      this.isEnabled = false;
+    }
+  }
+
+  /**
+   * Check if WhatsApp integration is enabled
+   */
+  isServiceEnabled(): boolean {
+    return this.isEnabled && this.client !== null;
   }
 
   /**
    * Send a WhatsApp message
    */
   async sendMessage(options: SendMessageOptions): Promise<SendMessageResponse> {
+    if (!this.isServiceEnabled()) {
+      return {
+        sid: '',
+        status: 'failed',
+        errorCode: 'SERVICE_DISABLED',
+        errorMessage: 'WhatsApp integration is not configured or disabled',
+      };
+    }
+
     try {
-      const message = await this.client.messages.create({
+      const message = await this.client!.messages.create({
         from: `whatsapp:${this.phoneNumber}`,
         to: `whatsapp:${options.to}`,
         body: options.body,
@@ -205,8 +236,13 @@ ${transaction.category ? `📂 Category: ${transaction.category}` : ''}
    */
   static verifyWebhook(signature: string, url: string, body: string, authToken: string): boolean {
     try {
+      if (!authToken) {
+        console.warn('⚠️ No auth token provided for webhook verification');
+        return false;
+      }
       return Twilio.validateRequest(authToken, signature, url, body);
-    } catch {
+    } catch (error) {
+      console.warn('⚠️ Webhook verification failed:', error);
       return false;
     }
   }

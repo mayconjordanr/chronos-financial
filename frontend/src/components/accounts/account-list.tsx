@@ -38,6 +38,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   AccountType,
+  type AccountTypeValue,
   accountTypeMetadata,
   type Account
 } from '@/lib/schemas/account'
@@ -69,7 +70,7 @@ export function AccountList({
   onViewTransactions
 }: AccountListProps) {
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterType, setFilterType] = useState<AccountType | 'all'>('all')
+  const [filterType, setFilterType] = useState<AccountTypeValue | 'all'>('all')
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [sortBy, setSortBy] = useState<SortBy>('name')
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc')

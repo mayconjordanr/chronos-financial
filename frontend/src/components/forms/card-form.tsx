@@ -52,7 +52,7 @@ export function CardForm({
   const supportedNetworks = getSupportedNetworks()
 
   const form = useForm<CardFormData>({
-    resolver: zodResolver(cardSchemaWithConditionals),
+    resolver: zodResolver(cardSchemaWithConditionals) as any,
     defaultValues: {
       name: '',
       last4digits: '',

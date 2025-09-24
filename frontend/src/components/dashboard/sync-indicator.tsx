@@ -15,6 +15,7 @@ import {
   Upload
 } from "lucide-react"
 import { useRealtime } from "@/lib/hooks/use-realtime"
+import { useRealTimeContext } from "@/lib/providers/realtime-provider"
 import { useOffline } from "@/lib/hooks/use-offline"
 
 type SyncStatus = 'connected' | 'disconnected' | 'syncing' | 'error' | 'offline' | 'pending'
@@ -35,14 +36,11 @@ export function SyncIndicator({
   // Get real-time connection status
   const {
     isConnected,
-    isConnecting,
-    isReconnecting,
-    connectionError,
-    reconnectAttempts,
-    lastConnected,
     connect,
     disconnect
-  } = useRealtime({ autoConnect: true })
+  } = useRealTimeContext()
+
+  const { isReconnecting, error: connectionError, reconnectAttempts } = useRealtime([])
 
   // Get offline status and pending operations
   const {
@@ -62,7 +60,7 @@ export function SyncIndicator({
     if (isSyncing) return 'syncing'
     if (pendingCount > 0) return 'pending'
     if (connectionError) return 'error'
-    if (isConnecting || isReconnecting) return 'syncing'
+    if (isReconnecting) return 'syncing'
     if (isConnected) return 'connected'
     return 'disconnected'
   })()
@@ -124,7 +122,7 @@ export function SyncIndicator({
   const Icon = config.icon
 
   // Use the most recent sync time available
-  const displayLastSync = lastSync || lastConnected || lastSyncAttempt
+  const displayLastSync = lastSync || lastSyncAttempt
 
   const handleRetry = () => {
     if (onRetry) {
@@ -241,7 +239,7 @@ export function SyncIndicator({
                       onClick={handleRetry}
                       size="sm"
                       className="flex-1 h-7 text-xs"
-                      disabled={currentStatus === 'syncing'}
+                      disabled={false}
                     >
                       <RefreshCw className="h-3 w-3 mr-1" />
                       {currentStatus === 'pending' ? 'Sync Now' : 'Retry'}

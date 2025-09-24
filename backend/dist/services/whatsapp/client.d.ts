@@ -17,7 +17,9 @@ export interface SendMessageResponse {
 export declare class WhatsAppClient {
     private client;
     private phoneNumber;
+    private isEnabled;
     constructor(config: WhatsAppConfig);
+    isServiceEnabled(): boolean;
     sendMessage(options: SendMessageOptions): Promise<SendMessageResponse>;
     sendFinancialReport(to: string, report: string): Promise<SendMessageResponse>;
     sendTransactionConfirmation(to: string, transaction: {

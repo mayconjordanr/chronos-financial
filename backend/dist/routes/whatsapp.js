@@ -26,6 +26,17 @@ const LinkPhoneSchema = zod_1.z.object({
 async function whatsappRoutes(fastify) {
     const webhookHandler = new webhook_1.WebhookHandler();
     fastify.setErrorHandler(whatsapp_auth_1.whatsAppErrorHandler);
+    const checkWhatsAppEnabled = async (request, reply) => {
+        const isEnabled = request.server.whatsappEnabled;
+        if (!isEnabled) {
+            reply.code(503).send({
+                success: false,
+                error: 'WhatsApp integration is not configured or disabled',
+                service: 'whatsapp'
+            });
+            return;
+        }
+    };
     fastify.get('/webhook', {
         preHandler: [whatsapp_auth_1.handleWebhookVerification],
         handler: async (request, reply) => {
@@ -54,7 +65,7 @@ async function whatsappRoutes(fastify) {
         },
     });
     fastify.post('/send', {
-        preHandler: [auth_middleware_1.authenticateToken],
+        preHandler: [auth_middleware_1.authenticateToken, checkWhatsAppEnabled],
         schema: {
             body: SendMessageSchema,
             response: {
@@ -127,6 +138,20 @@ async function whatsappRoutes(fastify) {
         handler: async (request, reply) => {
             try {
                 const user = request.user;
+                const isEnabled = request.server.whatsappEnabled;
+                if (!isEnabled) {
+                    reply.send({
+                        serviceEnabled: false,
+                        isLinked: false,
+                        isVerified: false,
+                        phoneNumber: null,
+                        whatsappNumber: null,
+                        messagesLast24h: 0,
+                        lastActivity: null,
+                        message: 'WhatsApp integration is not configured'
+                    });
+                    return;
+                }
                 const whatsappUser = await prisma.whatsAppUser.findFirst({
                     where: {
                         tenantId: user.tenantId,
@@ -143,6 +168,7 @@ async function whatsappRoutes(fastify) {
                     },
                 });
                 reply.send({
+                    serviceEnabled: true,
                     isLinked: !!whatsappUser,
                     isVerified: whatsappUser?.isVerified || false,
                     phoneNumber: whatsappUser?.phoneNumber,
@@ -160,7 +186,7 @@ async function whatsappRoutes(fastify) {
         },
     });
     fastify.post('/link-phone', {
-        preHandler: [auth_middleware_1.authenticateToken],
+        preHandler: [auth_middleware_1.authenticateToken, checkWhatsAppEnabled],
         schema: {
             body: LinkPhoneSchema,
         },
@@ -215,7 +241,7 @@ async function whatsappRoutes(fastify) {
         },
     });
     fastify.post('/send-verification', {
-        preHandler: [auth_middleware_1.authenticateToken],
+        preHandler: [auth_middleware_1.authenticateToken, checkWhatsAppEnabled],
         schema: {
             body: VerificationCodeSchema,
         },
@@ -255,7 +281,7 @@ async function whatsappRoutes(fastify) {
         },
     });
     fastify.post('/verify', {
-        preHandler: [auth_middleware_1.authenticateToken],
+        preHandler: [auth_middleware_1.authenticateToken, checkWhatsAppEnabled],
         schema: {
             body: VerifyUserSchema,
         },
@@ -393,7 +419,7 @@ async function whatsappRoutes(fastify) {
     });
     if (process.env.NODE_ENV === 'development') {
         fastify.post('/test', {
-            preHandler: [auth_middleware_1.authenticateToken],
+            preHandler: [auth_middleware_1.authenticateToken, checkWhatsAppEnabled],
             schema: {
                 body: {
                     type: 'object',
