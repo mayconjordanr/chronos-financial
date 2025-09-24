@@ -568,11 +568,15 @@ enum PlanType {
   PROFESSIONAL
   ENTERPRISE
   CUSTOM
+
+  @@schema("public")
 }
 
 enum BillingCycle {
   MONTHLY
   YEARLY
+
+  @@schema("public")
 }
 
 enum TenantStatus {
@@ -580,6 +584,8 @@ enum TenantStatus {
   SUSPENDED
   TRIAL
   EXPIRED
+
+  @@schema("public")
 }
 
 enum UserRole {
@@ -587,12 +593,16 @@ enum UserRole {
   ADMIN
   USER
   VIEWER
+
+  @@schema("public")
 }
 
 enum UserStatus {
   ACTIVE
   INACTIVE
   SUSPENDED
+
+  @@schema("public")
 }
 
 enum InvitationStatus {
@@ -600,6 +610,8 @@ enum InvitationStatus {
   ACCEPTED
   EXPIRED
   REVOKED
+
+  @@schema("public")
 }
 
 enum AccountType {
@@ -610,6 +622,8 @@ enum AccountType {
   LOAN
   CASH
   OTHER
+
+  @@schema("public")
 }
 
 enum AccountSubtype {
@@ -638,24 +652,32 @@ enum AccountSubtype {
   // Other
   PREPAID
   CASH
+
+  @@schema("public")
 }
 
 enum CategoryType {
   INCOME
   EXPENSE
   TRANSFER
+
+  @@schema("public")
 }
 
 enum TransactionType {
   DEBIT
   CREDIT
   TRANSFER
+
+  @@schema("public")
 }
 
 enum TransactionStatus {
   PENDING
   POSTED
   CANCELLED
+
+  @@schema("public")
 }
 
 enum PaymentMethod {
@@ -666,6 +688,8 @@ enum PaymentMethod {
   MOBILE_PAYMENT
   CRYPTOCURRENCY
   OTHER
+
+  @@schema("public")
 }
 
 enum RecurrenceFrequency {
@@ -674,6 +698,8 @@ enum RecurrenceFrequency {
   MONTHLY
   QUARTERLY
   YEARLY
+
+  @@schema("public")
 }
 
 enum BudgetPeriod {
@@ -681,6 +707,8 @@ enum BudgetPeriod {
   MONTHLY
   QUARTERLY
   YEARLY
+
+  @@schema("public")
 }
 
 enum GoalType {
@@ -689,6 +717,8 @@ enum GoalType {
   INVESTMENT
   PURCHASE
   EMERGENCY_FUND
+
+  @@schema("public")
 }
 
 enum WhatsAppState {
@@ -700,6 +730,8 @@ enum WhatsAppState {
   VIEW_TRANSACTIONS
   SET_BUDGET
   VIEW_REPORTS
+
+  @@schema("public")
 }
 
 enum WhatsAppMessageType {
@@ -710,11 +742,15 @@ enum WhatsAppMessageType {
   VIDEO
   LOCATION
   CONTACT
+
+  @@schema("public")
 }
 
 enum MessageDirection {
   INBOUND
   OUTBOUND
+
+  @@schema("public")
 }
 
 enum MessageStatus {
@@ -722,4 +758,6 @@ enum MessageStatus {
   DELIVERED
   READ
   FAILED
+
+  @@schema("public")
 }
