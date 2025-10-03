@@ -310,7 +310,7 @@ export function TransactionForm({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.5 }}
-                  className={transactionType === 'transfer' ? 'col-span-1' : 'md:col-span-1'}
+                  className={'md:col-span-1'}
                 >
                   <FormField
                     control={form.control}

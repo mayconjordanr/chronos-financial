@@ -54,7 +54,6 @@ export function useMultiTabSync() {
           userAgent: navigator.userAgent
         },
         timestamp: Date.now(),
-        tabId: tabIdRef.current
       })
 
       // Start heartbeat
@@ -83,7 +82,6 @@ export function useMultiTabSync() {
           type: 'TAB_FOCUS',
           payload: { url: window.location.href },
           timestamp: Date.now(),
-          tabId: tabIdRef.current
         })
       } else {
         broadcastMessage({
